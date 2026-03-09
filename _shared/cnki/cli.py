@@ -14,13 +14,13 @@ if __package__ in (None, ""):
     from browser import fail, ok, run_async  # type: ignore
     from journal import journal_index, journal_search, journal_toc  # type: ignore
     from paper import download, export, paper_detail  # type: ignore
-    from search import advanced_search, navigate_pages, parse_results, search  # type: ignore
+    from search import advanced_search, collect_details, navigate_pages, parse_results, search, thesis_search  # type: ignore
     from zotero import ZoteroError  # type: ignore
 else:
     from .browser import fail, ok, run_async
     from .journal import journal_index, journal_search, journal_toc
     from .paper import download, export, paper_detail
-    from .search import advanced_search, navigate_pages, parse_results, search
+    from .search import advanced_search, collect_details, navigate_pages, parse_results, search, thesis_search
     from .zotero import ZoteroError
 
 
@@ -32,6 +32,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search", help="Search CNKI by keyword.")
     search_parser.add_argument("--query", required=True)
+
+    thesis_parser = subparsers.add_parser(
+        "thesis-search",
+        help="Search CNKI theses and filter by doctoral/master degree.",
+    )
+    thesis_parser.add_argument("--query", required=True)
+    thesis_parser.add_argument(
+        "--degree",
+        choices=["both", "doctoral", "master"],
+        default="both",
+        help="Degree scope: doctoral (CDFD), master (CMFD), or both.",
+    )
+    thesis_parser.add_argument("--count", type=int, default=20, help="Number of thesis records to collect.")
+    thesis_parser.add_argument("--max-pages", type=int, default=20, help="Maximum results pages to scan.")
+
+    collect_parser = subparsers.add_parser(
+        "collect-details",
+        help="Search CNKI and enrich results with abstract, keywords, fund, and detail metadata.",
+    )
+    collect_parser.add_argument("--query", required=True)
+    collect_parser.add_argument("--count", type=int, default=10, help="Number of enriched records to collect.")
+    collect_parser.add_argument("--max-pages", type=int, default=20, help="Maximum results pages to scan.")
+    collect_parser.add_argument("--scope", choices=["papers", "theses"], default="papers")
+    collect_parser.add_argument(
+        "--degree",
+        choices=["both", "doctoral", "master"],
+        default="both",
+        help="Degree scope when --scope theses is used.",
+    )
 
     advanced_parser = subparsers.add_parser("advanced-search", help="Run an advanced CNKI search.")
     advanced_parser.add_argument("--query", required=True)
@@ -106,6 +135,10 @@ def dispatch(args) -> dict[str, Any]:
     try:
         if args.command == "search":
             return run_async(search, args)
+        if args.command == "thesis-search":
+            return run_async(thesis_search, args)
+        if args.command == "collect-details":
+            return run_async(collect_details, args)
         if args.command == "advanced-search":
             return run_async(advanced_search, args)
         if args.command == "parse-results":

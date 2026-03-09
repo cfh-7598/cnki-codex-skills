@@ -67,13 +67,18 @@ async def ensure_detail_page(session: ChromeSession, page, url: str | None) -> N
     await session.require_no_captcha(page)
 
 
+async def extract_detail_from_page(page) -> dict[str, Any]:
+    detail = await page.evaluate(DETAIL_JS)
+    if not detail:
+        raise CnkiError("page_not_supported", "The current page is not a CNKI paper detail page.", page_url=page.url)
+    return detail
+
+
 async def paper_detail(args) -> dict[str, Any]:
     async with ChromeSession(args.cdp_url) as session:
         page = await session.get_or_open_page(args.url or SEARCH_URL)
         await ensure_detail_page(session, page, args.url)
-        detail = await page.evaluate(DETAIL_JS)
-        if not detail:
-            raise CnkiError("page_not_supported", "The current page is not a CNKI paper detail page.", page_url=page.url)
+        detail = await extract_detail_from_page(page)
         return ok("Extracted CNKI paper details.", detail, page_url=page.url)
 
 

@@ -30,6 +30,10 @@ Use this skill as the thin entry point for CNKI tasks. Do not load the whole wor
 ## Route tasks
 
 - Search papers: use `$cnki-search-codex`
+- Search and return abstracts/keywords/fund info in batch: use `$cnki-collect-details-codex`
+- Search theses (master + doctoral): use `$cnki-thesis-search-codex`
+- Search doctoral theses only: use `$cnki-doctoral-search-codex`
+- Search master theses only: use `$cnki-master-search-codex`
 - Filtered search: use `$cnki-advanced-search-codex`
 - Parse the current result page: use `$cnki-parse-results-codex`
 - Extract paper metadata: use `$cnki-paper-detail-codex`

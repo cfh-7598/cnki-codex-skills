@@ -12,6 +12,9 @@ These selectors and text hooks were migrated from the Claude-oriented `cookjohn/
 - Result journal: `td.source a`
 - Result count: `.pagerTitleCell`
 - Page indicator: `.countPageMark`
+- Dissertation filter (mixed): `a[name="classify"][resource="DISSERTATION"][data-chs="CDFD,CMFD"]`
+- Dissertation filter (doctoral): `a[name="classify"][resource="DISSERTATION"][data-chs="CDFD"]`
+- Dissertation filter (master): `a[name="classify"][resource="DISSERTATION"][data-chs="CMFD"]`
 
 ## Paper detail
 

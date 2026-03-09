@@ -15,8 +15,10 @@ Use this skill for first-pass CNKI literature search.
 ## Run
 
 ```bash
-python3 scripts/run.py --query "人工智能"
+python3 _shared/cnki/cli.py search --query "人工智能"
 ```
+
+The shared runtime forces the normal search entry back to `总库 + 中文` before submitting the query, so it does not drift into foreign-mode search.
 
 ## Return shape
 
@@ -32,4 +34,5 @@ Expect JSON with:
 
 - Use `$cnki-parse-results-codex` if the user already has a result page open.
 - Use `$cnki-paper-detail-codex` for a specific paper URL.
+- Use `$cnki-collect-details-codex` when the user wants abstracts, keywords, fund info, or other detail-page fields returned in batch.
 - Use `$cnki-navigate-pages-codex` to paginate or sort.
