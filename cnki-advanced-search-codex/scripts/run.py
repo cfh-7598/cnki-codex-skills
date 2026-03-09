@@ -2,12 +2,11 @@
 """Portable wrapper for the cnki-advanced-search-codex skill."""
 
 from pathlib import Path
-import runpy
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-CLI = ROOT / "_shared" / "cnki" / "cli.py"
+sys.path.append(str(ROOT / "_shared" / "cnki"))
 
-sys.argv = [str(CLI), "advanced-search", *sys.argv[1:]]
-runpy.run_path(str(CLI), run_name="__main__")
+from skill_wrapper import run_skill  # type: ignore  # noqa: E402
 
+run_skill("advanced-search")
