@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI (Codex)"
+  short_description: "Route CNKI tasks to Codex skills"
+  default_prompt: "Use $cnki-codex to route a CNKI task to the right Codex skill."

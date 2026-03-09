@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Paper Detail (Codex)"
+  short_description: "Extract detailed CNKI paper metadata"
+  default_prompt: "Use $cnki-paper-detail-codex to extract detailed CNKI paper metadata."

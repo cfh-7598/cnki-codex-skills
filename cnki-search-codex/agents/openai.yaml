@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Search (Codex)"
+  short_description: "Search CNKI papers from Codex"
+  default_prompt: "Use $cnki-search-codex to search CNKI papers from an existing Chrome session."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Advanced Search (Codex)"
+  short_description: "Run filtered CNKI searches in Codex"
+  default_prompt: "Use $cnki-advanced-search-codex to run filtered CNKI searches in Codex."

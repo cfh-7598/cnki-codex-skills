@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Export (Codex)"
+  short_description: "Export CNKI citations or send to Zotero"
+  default_prompt: "Use $cnki-export-codex to export CNKI citations or send them to Zotero."

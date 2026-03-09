@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Parse Results (Codex)"
+  short_description: "Parse the current CNKI results page"
+  default_prompt: "Use $cnki-parse-results-codex to parse the current CNKI results page."

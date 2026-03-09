@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Navigate Pages (Codex)"
+  short_description: "Move through CNKI result pages"
+  default_prompt: "Use $cnki-navigate-pages-codex to move through CNKI result pages."

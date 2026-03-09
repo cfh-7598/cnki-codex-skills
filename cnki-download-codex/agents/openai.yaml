@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Download (Codex)"
+  short_description: "Trigger CNKI PDF or CAJ downloads"
+  default_prompt: "Use $cnki-download-codex to trigger CNKI PDF or CAJ downloads."

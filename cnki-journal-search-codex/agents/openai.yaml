@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Journal Search (Codex)"
+  short_description: "Find CNKI journals from Codex"
+  default_prompt: "Use $cnki-journal-search-codex to find CNKI journals from Codex."

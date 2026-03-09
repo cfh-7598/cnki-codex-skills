@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Journal Index (Codex)"
+  short_description: "Check CNKI journal indexing data"
+  default_prompt: "Use $cnki-journal-index-codex to check CNKI journal indexing data."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CNKI Journal TOC (Codex)"
+  short_description: "Browse CNKI journal issues and TOCs"
+  default_prompt: "Use $cnki-journal-toc-codex to browse CNKI journal issues and TOCs."
