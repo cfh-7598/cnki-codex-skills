@@ -11,10 +11,21 @@ Use this skill as the thin entry point for CNKI tasks. Do not load the whole wor
 
 - Start Chrome with remote debugging enabled:
   ```bash
+  # macOS
   /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+
+  # Linux
+  google-chrome --remote-debugging-port=9222
+
+  # Windows
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222
   ```
 - Log in to CNKI in that Chrome session if the task needs downloads or export data.
 - Expect manual captcha handling. If CNKI shows the Tencent slider, stop and ask the user to solve it in Chrome.
+- Install the shared dependency once after cloning:
+  ```bash
+  python -m pip install -r requirements.txt
+  ```
 
 ## Route tasks
 
@@ -34,11 +45,10 @@ Use this skill as the thin entry point for CNKI tasks. Do not load the whole wor
 All sub-skills call the same CLI:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py --help
+python3 _shared/cnki/cli.py --help
 ```
 
 Read shared notes only when needed:
 
-- `/Users/cfh/Nutstore Files/code/skill/codex-skills/_shared/cnki/references/usage.md`
-- `/Users/cfh/Nutstore Files/code/skill/codex-skills/_shared/cnki/references/selectors.md`
-
+- `../_shared/cnki/references/usage.md`
+- `../_shared/cnki/references/selectors.md`

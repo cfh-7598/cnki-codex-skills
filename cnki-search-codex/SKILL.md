@@ -15,7 +15,7 @@ Use this skill for first-pass CNKI literature search.
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py search --query "人工智能"
+python3 scripts/run.py --query "人工智能"
 ```
 
 ## Return shape
@@ -33,4 +33,3 @@ Expect JSON with:
 - Use `$cnki-parse-results-codex` if the user already has a result page open.
 - Use `$cnki-paper-detail-codex` for a specific paper URL.
 - Use `$cnki-navigate-pages-codex` to paginate or sort.
-

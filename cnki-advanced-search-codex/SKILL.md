@@ -10,7 +10,7 @@ Use this skill when keyword search is too broad and CNKI filters matter.
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py advanced-search \
+python3 scripts/run.py \
   --query "人工智能" \
   --source CSSCI \
   --start-year 2020 \
@@ -30,4 +30,3 @@ python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py a
 
 - This skill uses the old CNKI advanced search page because that page still exposes source-category checkboxes.
 - Return data includes both the result list and the applied filters.
-

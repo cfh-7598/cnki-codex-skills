@@ -12,18 +12,17 @@ Use this skill only on an existing CNKI result page.
 Go to the next page:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py navigate-pages --action next
+python3 scripts/run.py --action next
 ```
 
 Go to page 3:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py navigate-pages --page 3
+python3 scripts/run.py --page 3
 ```
 
 Sort by date:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py navigate-pages --sort-by date
+python3 scripts/run.py --sort-by date
 ```
-

@@ -11,7 +11,7 @@ Use an existing logged-in Chrome session. Start Chrome with remote debugging ena
 Then run the shared CLI:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py search --query "人工智能"
+python3 _shared/cnki/cli.py search --query "人工智能"
 ```
 
 ## Common workflows
@@ -32,4 +32,3 @@ python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py s
 - The CLI only reuses the current browser session. It does not solve CNKI captchas or log in for the user.
 - Batch export works on the current results page, not the entire result set.
 - If CNKI changes its DOM or export endpoint shape, update the selectors or page scripts in the shared implementation.
-

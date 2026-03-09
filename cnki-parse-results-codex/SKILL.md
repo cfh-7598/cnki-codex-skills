@@ -10,11 +10,10 @@ Use this skill only when a CNKI result page is already open in the connected Chr
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py parse-results
+python3 scripts/run.py
 ```
 
 ## Notes
 
 - The command fails with `page_not_supported` if the current page is not a CNKI results page.
 - Use `$cnki-search-codex` if no result page exists yet.
-

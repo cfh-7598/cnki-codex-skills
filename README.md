@@ -2,6 +2,18 @@
 
 Codex-native CNKI skills for literature search, paper metadata extraction, journal lookup, TOC browsing, download triggering, and citation export through an existing Chrome CDP session.
 
+## Installation
+
+Clone this repository anywhere, then run the installer:
+
+```bash
+git clone https://github.com/cfh-7598/cnki-codex-skills.git
+cd cnki-codex-skills
+bash install.sh
+```
+
+This copies `_shared` and all `cnki*-codex` skill folders into `~/.codex/skills/`, which is the layout Codex expects.
+
 ## What is included
 
 - 10 focused Codex skills
@@ -36,7 +48,14 @@ Codex-native CNKI skills for literature search, paper metadata extraction, journ
 Start Chrome with remote debugging:
 
 ```bash
+# macOS
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+
+# Linux
+google-chrome --remote-debugging-port=9222
+
+# Windows
+"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222
 ```
 
 Run the shared CLI directly:
@@ -46,7 +65,12 @@ python3 _shared/cnki/cli.py search --query "人工智能"
 python3 _shared/cnki/cli.py journal-search --query "计算机学报"
 ```
 
-Or invoke a specific skill from Codex after installing this repository under your Codex skills directory.
+Or run a skill-local wrapper that remains valid after cloning anywhere:
+
+```bash
+python3 cnki-search-codex/scripts/run.py --query "人工智能"
+python3 cnki-journal-search-codex/scripts/run.py --query "计算机学报"
+```
 
 ## Notes
 
@@ -57,4 +81,3 @@ Or invoke a specific skill from Codex after installing this repository under you
 ## Credits
 
 The selectors and workflow mapping were adapted from the public Claude-oriented project [`cookjohn/cnki-skills`](https://github.com/cookjohn/cnki-skills), then rewritten for Codex and Playwright/CDP.
-

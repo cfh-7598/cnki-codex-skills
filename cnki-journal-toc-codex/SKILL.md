@@ -10,7 +10,7 @@ Use this skill for issue-level browsing.
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py journal-toc \
+python3 scripts/run.py \
   --query "计算机学报" \
   --year 2025 \
   --issue 01
@@ -19,7 +19,7 @@ python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py j
 Open the original TOC reader:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py journal-toc \
+python3 scripts/run.py \
   --query "计算机学报" \
   --year 2025 \
   --issue 01 \
@@ -29,4 +29,3 @@ python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py j
 ## Notes
 
 - `--download` opens the reader page for the original TOC. CNKI login and browser download settings still control the final file download.
-

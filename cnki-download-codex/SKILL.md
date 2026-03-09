@@ -10,11 +10,10 @@ Use this skill only when the user wants the actual CNKI file download.
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py download --url "https://..." --format pdf
+python3 scripts/run.py --url "https://..." --format pdf
 ```
 
 ## Notes
 
 - The command fails with `not_logged_in` if the connected Chrome session is not authenticated for CNKI downloads.
 - CNKI captcha still requires manual handling.
-

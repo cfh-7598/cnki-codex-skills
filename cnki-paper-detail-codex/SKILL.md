@@ -12,16 +12,15 @@ Use this skill for paper-level metadata extraction.
 On the current paper page:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py paper-detail
+python3 scripts/run.py
 ```
 
 On a specific URL:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py paper-detail --url "https://..."
+python3 scripts/run.py --url "https://..."
 ```
 
 ## Return shape
 
 Expect title, authors, affiliations, abstract, keywords, fund, classification, journal, and publication info.
-

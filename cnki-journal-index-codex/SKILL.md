@@ -12,16 +12,15 @@ Use this skill for journal-level quality and indexing checks.
 Search by journal name:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py journal-index --query "计算机学报"
+python3 scripts/run.py --query "计算机学报"
 ```
 
 Or open a known CNKI journal URL:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py journal-index --url "https://..."
+python3 scripts/run.py --url "https://..."
 ```
 
 ## Return shape
 
 Expect Chinese and English journal names, indexing tags, ISSN, CN, sponsor, frequency, and impact metrics.
-

@@ -12,19 +12,19 @@ Use this skill for citation export and Zotero handoff.
 Export a single paper to Zotero:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py export --url "https://..." --mode zotero
+python3 scripts/run.py --url "https://..." --mode zotero
 ```
 
 Export the current result page in batch:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py export --all-current-page --mode zotero
+python3 scripts/run.py --all-current-page --mode zotero
 ```
 
 Return GB/T text payloads:
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py export --url "https://..." --mode gb
+python3 scripts/run.py --url "https://..." --mode gb
 ```
 
 ## Notes

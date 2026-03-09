@@ -10,7 +10,7 @@ Use this skill for journal discovery before deeper indexing or TOC work.
 ## Run
 
 ```bash
-python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py journal-search --query "计算机学报"
+python3 scripts/run.py --query "计算机学报"
 ```
 
 ## Notes
@@ -18,4 +18,3 @@ python3 /Users/cfh/Nutstore\ Files/code/skill/codex-skills/_shared/cnki/cli.py j
 - The command auto-detects ISSN and CN-number style queries.
 - Use `$cnki-journal-index-codex` for indexing status.
 - Use `$cnki-journal-toc-codex` for issue browsing.
-
