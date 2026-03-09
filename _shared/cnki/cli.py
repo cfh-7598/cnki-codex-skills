@@ -61,6 +61,30 @@ def build_parser() -> argparse.ArgumentParser:
         default="both",
         help="Degree scope when --scope theses is used.",
     )
+    collect_parser.add_argument(
+        "--concurrency-mode",
+        choices=["serial", "adaptive"],
+        default="adaptive",
+        help="Detail-page collection mode. Adaptive is the default safer batch mode.",
+    )
+    collect_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=4,
+        help="Maximum detail-page worker count when adaptive mode is used.",
+    )
+    collect_parser.add_argument(
+        "--min-delay-ms",
+        type=int,
+        default=300,
+        help="Minimum randomized delay before each detail-page request.",
+    )
+    collect_parser.add_argument(
+        "--max-delay-ms",
+        type=int,
+        default=1200,
+        help="Maximum randomized delay before each detail-page request.",
+    )
 
     advanced_parser = subparsers.add_parser("advanced-search", help="Run an advanced CNKI search.")
     advanced_parser.add_argument("--query", required=True)
@@ -115,6 +139,8 @@ def summarize(result: dict[str, Any]) -> str:
     if result["status"] == "error":
         return f'{result["error"]}: {result["message"]}'
     if result["status"] == "blocked":
+        return result["message"]
+    if result["status"] == "partial":
         return result["message"]
     data = result.get("data")
     if isinstance(data, dict):

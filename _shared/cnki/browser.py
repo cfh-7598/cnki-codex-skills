@@ -43,8 +43,15 @@ def ok(message: str, data: Any = None, *, page_url: str | None = None) -> dict[s
     return payload
 
 
-def blocked(message: str, *, page_url: str | None = None) -> dict[str, Any]:
-    payload = {"status": "blocked", "message": message, "error": "captcha", "data": None}
+def blocked(message: str, data: Any = None, *, page_url: str | None = None) -> dict[str, Any]:
+    payload = {"status": "blocked", "message": message, "error": "captcha", "data": data}
+    if page_url:
+        payload["page_url"] = page_url
+    return payload
+
+
+def partial(message: str, data: Any = None, *, page_url: str | None = None) -> dict[str, Any]:
+    payload = {"status": "partial", "message": message, "error": "partial", "data": data}
     if page_url:
         payload["page_url"] = page_url
     return payload
@@ -137,8 +144,94 @@ class ChromeSession:
         except PlaywrightError:
             return False
 
+    async def dismiss_known_overlays(self, page: Page) -> None:
+        try:
+            await page.evaluate(
+                """() => {
+                    for (const el of document.querySelectorAll('.layui-layer-close,.layui-layer-btn0')) {
+                        if (el instanceof HTMLElement) el.click();
+                    }
+                    for (const el of document.querySelectorAll('.layui-layer-shade,.layui-layer')) {
+                        if (el instanceof HTMLElement) {
+                            el.style.pointerEvents = 'none';
+                            if (el.classList.contains('layui-layer-shade')) {
+                                el.style.display = 'none';
+                            }
+                        }
+                    }
+                }"""
+            )
+        except PlaywrightError:
+            return
+
+    async def detect_risk(self, page: Page) -> dict[str, Any] | None:
+        try:
+            risk = await page.evaluate(
+                """(selector) => {
+                    const text = document.body?.innerText || '';
+                    const overlay = Array.from(document.querySelectorAll('.layui-layer-shade,.layui-layer'))
+                      .some((el) => {
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none'
+                          && style.visibility !== 'hidden'
+                          && rect.width > 0
+                          && rect.height > 0;
+                      });
+                    const hasCaptchaSelector = (() => {
+                      const el = document.querySelector(selector);
+                      if (!el) return false;
+                      const style = window.getComputedStyle(el);
+                      const rect = el.getBoundingClientRect();
+                      return style.display !== 'none'
+                        && style.visibility !== 'hidden'
+                        && rect.width > 0
+                        && rect.height > 0;
+                    })();
+                    const hasVerificationText = text.includes('拖动下方拼图完成验证') || text.includes('安全验证');
+                    const hasErrorText = text.includes('ERR_CONNECTION_CLOSED')
+                      || text.includes('ERR_CERT_COMMON_NAME_INVALID')
+                      || text.includes('ERR_');
+                    return {
+                      hasCaptchaSelector,
+                      hasVerificationText,
+                      hasOverlay: overlay,
+                      hasErrorText,
+                      title: document.title || '',
+                      bodySnippet: text.slice(0, 500)
+                    };
+                }""",
+                CAPTCHA_SELECTOR,
+            )
+        except PlaywrightError:
+            return None
+
+        if risk.get("hasCaptchaSelector") or risk.get("hasVerificationText"):
+            return {
+                "code": "captcha",
+                "message": "CNKI is showing a slider captcha or verification gate.",
+                "page_url": page.url,
+                "detail": risk,
+            }
+        if risk.get("hasOverlay"):
+            return {
+                "code": "overlay",
+                "message": "CNKI is showing a blocking overlay dialog.",
+                "page_url": page.url,
+                "detail": risk,
+            }
+        if page.url.startswith("chrome-error://") or risk.get("hasErrorText"):
+            return {
+                "code": "page_error",
+                "message": "CNKI detail page failed to load cleanly.",
+                "page_url": page.url,
+                "detail": risk,
+            }
+        return None
+
     async def require_no_captcha(self, page: Page) -> None:
-        if await self.detect_captcha(page):
+        risk = await self.detect_risk(page)
+        if risk and risk["code"] == "captcha":
             raise CnkiError(
                 "captcha",
                 "CNKI is showing a slider captcha. Solve it in Chrome, then rerun the command.",

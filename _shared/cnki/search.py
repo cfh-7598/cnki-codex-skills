@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
+import random
 from typing import Any
 
 if __package__ in (None, ""):
@@ -10,11 +12,11 @@ if __package__ in (None, ""):
     from pathlib import Path
 
     sys.path.append(str(Path(__file__).resolve().parent))
-    from browser import ChromeSession, CnkiError, ok  # type: ignore
+    from browser import ChromeSession, CnkiError, blocked, ok, partial  # type: ignore
     from cnki_selectors import ADVANCED_SEARCH_URL, SEARCH_URL  # type: ignore
     from paper import ensure_detail_page, extract_detail_from_page  # type: ignore
 else:
-    from .browser import ChromeSession, CnkiError, ok
+    from .browser import ChromeSession, CnkiError, blocked, ok, partial
     from .cnki_selectors import ADVANCED_SEARCH_URL, SEARCH_URL
     from .paper import ensure_detail_page, extract_detail_from_page
 
@@ -67,6 +69,29 @@ THESIS_ALLOWED_DEGREES = {
     "doctoral": {"博士"},
     "master": {"硕士"},
 }
+DETAIL_RETRYABLE_ERROR_CODES = {"overlay", "page_error", "page_not_supported", "timeout", "browser_error", "unexpected_error"}
+
+
+@dataclass(slots=True)
+class DetailConcurrencyConfig:
+    mode: str
+    initial_concurrency: int
+    max_concurrency: int
+    min_delay_ms: int
+    max_delay_ms: int
+    success_to_three: int = 5
+    success_to_four: int = 13
+    max_retries: int = 2
+    max_recoveries: int = 2
+    cooldown_min_ms: int = 20000
+    cooldown_max_ms: int = 45000
+
+
+@dataclass(slots=True)
+class DetailJob:
+    index: int
+    item: dict[str, Any]
+    attempts: int = 0
 
 
 async def parse_results_from_page(page) -> dict[str, Any]:
@@ -143,7 +168,7 @@ async def _set_visible_search_input(page, query: str) -> None:
 
 async def _submit_search(page, query: str) -> None:
     async def _submit_once(*, use_enter: bool) -> str | None:
-        dialog_task = asyncio.create_task(page.wait_for_event("dialog", timeout=2000))
+        dialog_task = asyncio.create_task(page.wait_for_event("dialog"))
         results_task = asyncio.create_task(page.locator(".result-table-list tbody tr").first.wait_for(timeout=6000))
         try:
             if use_enter:
@@ -164,6 +189,9 @@ async def _submit_search(page, query: str) -> None:
                 message = dialog.message
                 await dialog.accept()
                 return message
+
+            # No dialog appeared and the first result row became available.
+            finished.result()
 
             await page.wait_for_timeout(150)
             return None
@@ -302,47 +330,296 @@ async def _move_to_next_results_page(page, current_page: int) -> bool:
     return moved
 
 
-async def _enrich_items_with_detail(session: ChromeSession, items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    assert session.context is not None
-    detail_page = await session.context.new_page()
-    enriched: list[dict[str, Any]] = []
-    errors: list[dict[str, Any]] = []
+def _build_detail_config(args) -> DetailConcurrencyConfig:
+    mode = getattr(args, "concurrency_mode", "adaptive") or "adaptive"
+    min_delay_ms = max(0, int(getattr(args, "min_delay_ms", 300) or 0))
+    max_delay_ms = max(min_delay_ms, int(getattr(args, "max_delay_ms", 1200) or min_delay_ms))
+    if mode == "serial":
+        return DetailConcurrencyConfig(
+            mode="serial",
+            initial_concurrency=1,
+            max_concurrency=1,
+            min_delay_ms=min_delay_ms,
+            max_delay_ms=max_delay_ms,
+        )
+
+    max_concurrency = max(1, min(4, int(getattr(args, "max_concurrency", 4) or 4)))
+    return DetailConcurrencyConfig(
+        mode="adaptive",
+        initial_concurrency=min(2, max_concurrency),
+        max_concurrency=max_concurrency,
+        min_delay_ms=min_delay_ms,
+        max_delay_ms=max_delay_ms,
+    )
+
+
+def _make_detail_error(code: str, message: str, *, page_url: str | None = None, detail: Any = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"code": code, "message": message}
+    if page_url:
+        payload["page_url"] = page_url
+    if detail is not None:
+        payload["detail"] = detail
+    return payload
+
+
+def _merge_detail_into_record(record: dict[str, Any], detail: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(record)
+    merged["abstract"] = detail.get("abstract", "")
+    merged["keywords"] = detail.get("keywords", [])
+    merged["fund"] = detail.get("fund", "")
+    merged["classification"] = detail.get("classification", "")
+    merged["affiliations"] = detail.get("affiliations", [])
+    merged["detailAuthors"] = detail.get("authors", [])
+    merged["journalDetail"] = detail.get("journal", "")
+    merged["pubInfo"] = detail.get("pubInfo", "")
+    merged["detail"] = detail
+    return merged
+
+
+async def _sleep_with_jitter(config: DetailConcurrencyConfig) -> None:
+    if config.max_delay_ms <= 0:
+        return
+    delay_ms = random.randint(config.min_delay_ms, config.max_delay_ms)
+    if delay_ms > 0:
+        await asyncio.sleep(delay_ms / 1000)
+
+
+async def _collect_single_detail(
+    session: ChromeSession,
+    detail_page,
+    job: DetailJob,
+    config: DetailConcurrencyConfig,
+) -> dict[str, Any]:
+    record = dict(job.item)
+    detail_url = (record.get("url") or "").strip()
+    if not detail_url:
+        error = _make_detail_error("not_found", "Result item has no detail URL.")
+        return {"kind": "error", "job": job, "record": record, "error": error, "retryable": False}
+
+    await _sleep_with_jitter(config)
+    await session.dismiss_known_overlays(detail_page)
+
     try:
-        for item in items:
-            record = dict(item)
-            detail_url = (item.get("url") or "").strip()
-            if not detail_url:
-                error = {"code": "not_found", "message": "Result item has no detail URL."}
-                record["detailError"] = error
-                errors.append({"title": item.get("title", ""), "url": "", **error})
-                enriched.append(record)
-                continue
+        await ensure_detail_page(session, detail_page, detail_url)
+        await session.dismiss_known_overlays(detail_page)
+        risk = await session.detect_risk(detail_page)
+        if risk:
+            if risk["code"] == "captcha":
+                return {"kind": "captcha", "job": job, "record": record, "risk": risk}
+            return {"kind": "risk", "job": job, "record": record, "risk": risk}
+        detail = await extract_detail_from_page(detail_page)
+        return {"kind": "success", "job": job, "record": _merge_detail_into_record(record, detail)}
+    except CnkiError as exc:
+        risk = await session.detect_risk(detail_page)
+        if risk:
+            if risk["code"] == "captcha":
+                return {"kind": "captcha", "job": job, "record": record, "risk": risk}
+            return {"kind": "risk", "job": job, "record": record, "risk": risk}
+        error = _make_detail_error(exc.code, exc.message, page_url=exc.page_url)
+        return {
+            "kind": "error",
+            "job": job,
+            "record": record,
+            "error": error,
+            "retryable": exc.code in DETAIL_RETRYABLE_ERROR_CODES,
+        }
+    except Exception as exc:  # noqa: BLE001
+        risk = await session.detect_risk(detail_page)
+        if risk:
+            if risk["code"] == "captcha":
+                return {"kind": "captcha", "job": job, "record": record, "risk": risk}
+            return {"kind": "risk", "job": job, "record": record, "risk": risk}
+        error = _make_detail_error("unexpected_error", str(exc), page_url=detail_page.url)
+        return {"kind": "error", "job": job, "record": record, "error": error, "retryable": True}
 
-            try:
-                await ensure_detail_page(session, detail_page, detail_url)
-                detail = await extract_detail_from_page(detail_page)
-            except CnkiError as exc:
-                if exc.code == "captcha":
-                    raise
-                error = {"code": exc.code, "message": exc.message, "page_url": exc.page_url}
-                record["detailError"] = error
-                errors.append({"title": item.get("title", ""), "url": detail_url, **error})
-                enriched.append(record)
-                continue
 
-            record["abstract"] = detail.get("abstract", "")
-            record["keywords"] = detail.get("keywords", [])
-            record["fund"] = detail.get("fund", "")
-            record["classification"] = detail.get("classification", "")
-            record["affiliations"] = detail.get("affiliations", [])
-            record["detailAuthors"] = detail.get("authors", [])
-            record["journalDetail"] = detail.get("journal", "")
-            record["pubInfo"] = detail.get("pubInfo", "")
-            record["detail"] = detail
-            enriched.append(record)
+async def _enrich_items_with_detail(
+    session: ChromeSession,
+    items: list[dict[str, Any]],
+    args,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    config = _build_detail_config(args)
+    assert session.context is not None
+
+    detail_pages = [await session.context.new_page() for _ in range(config.max_concurrency)]
+    records = [dict(item) for item in items]
+    errors: list[dict[str, Any]] = []
+    stats = {
+        "attempted": 0,
+        "succeeded": 0,
+        "failed": 0,
+        "retried": 0,
+        "captchaHits": 0,
+        "cooldowns": 0,
+    }
+    risk_events: list[dict[str, Any]] = []
+    pending = [DetailJob(index=index, item=dict(item)) for index, item in enumerate(items)]
+    current_concurrency = config.initial_concurrency
+    consecutive_successes = 0
+    recoveries = 0
+    blocked_state: dict[str, Any] | None = None
+    stopped_early = False
+
+    try:
+        while pending:
+            batch_size = 1 if config.mode == "serial" else min(current_concurrency, len(pending))
+            batch_jobs = [pending.pop(0) for _ in range(batch_size)]
+            outcomes = await asyncio.gather(
+                *[
+                    _collect_single_detail(session, detail_pages[index], job, config)
+                    for index, job in enumerate(batch_jobs)
+                ]
+            )
+
+            risk_in_batch = False
+            for outcome in outcomes:
+                stats["attempted"] += 1
+                job = outcome["job"]
+                title = job.item.get("title", "")
+                url = job.item.get("url", "")
+
+                if outcome["kind"] == "success":
+                    records[job.index] = outcome["record"]
+                    stats["succeeded"] += 1
+                    consecutive_successes += 1
+                    continue
+
+                consecutive_successes = 0
+
+                if outcome["kind"] == "captcha":
+                    stats["captchaHits"] += 1
+                    blocked_state = {
+                        "message": "CNKI showed a slider captcha during batch detail collection. Solve it in Chrome, then rerun the command.",
+                        "code": "captcha",
+                    }
+                    error = _make_detail_error(
+                        "captcha",
+                        "CNKI showed a slider captcha during batch detail collection.",
+                        page_url=outcome["risk"].get("page_url"),
+                        detail=outcome["risk"].get("detail"),
+                    )
+                    records[job.index]["detailError"] = error
+                    errors.append({"title": title, "url": url, **error})
+                    risk_events.append(
+                        {
+                            "type": "blocked",
+                            "code": "captcha",
+                            "title": title,
+                            "attempt": job.attempts + 1,
+                        }
+                    )
+                    break
+
+                if outcome["kind"] == "risk":
+                    risk_in_batch = True
+                    risk = outcome["risk"]
+                    risk_events.append(
+                        {
+                            "type": "risk",
+                            "code": risk["code"],
+                            "title": title,
+                            "attempt": job.attempts + 1,
+                        }
+                    )
+                    if job.attempts < config.max_retries:
+                        stats["retried"] += 1
+                        pending.append(DetailJob(index=job.index, item=job.item, attempts=job.attempts + 1))
+                    else:
+                        error = _make_detail_error(
+                            risk["code"],
+                            risk["message"],
+                            page_url=risk.get("page_url"),
+                            detail=risk.get("detail"),
+                        )
+                        records[job.index]["detailError"] = error
+                        errors.append({"title": title, "url": url, **error})
+                        stats["failed"] += 1
+                    continue
+
+                error = outcome["error"]
+                if outcome["retryable"] and job.attempts < config.max_retries:
+                    stats["retried"] += 1
+                    pending.append(DetailJob(index=job.index, item=job.item, attempts=job.attempts + 1))
+                    if error["code"] in DETAIL_RETRYABLE_ERROR_CODES:
+                        risk_in_batch = True
+                        risk_events.append(
+                            {
+                                "type": "retry",
+                                "code": error["code"],
+                                "title": title,
+                                "attempt": job.attempts + 1,
+                            }
+                        )
+                else:
+                    records[job.index]["detailError"] = error
+                    errors.append({"title": title, "url": url, **error})
+                    stats["failed"] += 1
+
+            if blocked_state:
+                stopped_early = True
+                break
+
+            if config.mode == "adaptive":
+                target_concurrency = current_concurrency
+                if risk_in_batch:
+                    if current_concurrency != 1:
+                        risk_events.append(
+                            {
+                                "type": "downgrade",
+                                "from": current_concurrency,
+                                "to": 1,
+                            }
+                        )
+                    target_concurrency = 1
+                    if pending:
+                        if recoveries < config.max_recoveries:
+                            cooldown_ms = random.randint(config.cooldown_min_ms, config.cooldown_max_ms)
+                            stats["cooldowns"] += 1
+                            recoveries += 1
+                            risk_events.append(
+                                {
+                                    "type": "cooldown",
+                                    "milliseconds": cooldown_ms,
+                                    "recovery": recoveries,
+                                }
+                            )
+                            current_concurrency = target_concurrency
+                            await asyncio.sleep(cooldown_ms / 1000)
+                        else:
+                            stopped_early = True
+                            risk_events.append({"type": "stop", "reason": "max_recoveries_exceeded"})
+                            current_concurrency = target_concurrency
+                            break
+                else:
+                    if consecutive_successes >= config.success_to_four:
+                        target_concurrency = min(4, config.max_concurrency)
+                    elif consecutive_successes >= config.success_to_three:
+                        target_concurrency = min(3, config.max_concurrency)
+                    if target_concurrency > current_concurrency:
+                        risk_events.append(
+                            {
+                                "type": "scale_up",
+                                "from": current_concurrency,
+                                "to": target_concurrency,
+                            }
+                        )
+                    current_concurrency = target_concurrency
+
+        meta = {
+            "concurrencyMode": config.mode,
+            "initialConcurrency": config.initial_concurrency,
+            "maxConcurrency": config.max_concurrency,
+            "finalConcurrency": current_concurrency,
+            "detailStats": stats,
+            "riskEvents": risk_events,
+            "blocked": blocked_state is not None,
+            "blockedMessage": blocked_state["message"] if blocked_state else "",
+            "stoppedEarly": stopped_early and blocked_state is None,
+        }
+        return records, errors, meta
     finally:
-        await detail_page.close()
-    return enriched, errors
+        for detail_page in detail_pages:
+            await detail_page.close()
 
 
 async def thesis_search(args) -> dict[str, Any]:
@@ -441,7 +718,7 @@ async def collect_details(args) -> dict[str, Any]:
             current_page += 1
 
         source_items = collected[:requested]
-        enriched_items, detail_errors = await _enrich_items_with_detail(session, source_items)
+        enriched_items, detail_errors, detail_meta = await _enrich_items_with_detail(session, source_items, args)
         data = {
             "query": args.query,
             "scope": scope,
@@ -450,6 +727,12 @@ async def collect_details(args) -> dict[str, Any]:
             "collected": len(enriched_items),
             "pagesScanned": current_page,
             "detailErrors": detail_errors,
+            "concurrencyMode": detail_meta["concurrencyMode"],
+            "initialConcurrency": detail_meta["initialConcurrency"],
+            "maxConcurrency": detail_meta["maxConcurrency"],
+            "finalConcurrency": detail_meta["finalConcurrency"],
+            "detailStats": detail_meta["detailStats"],
+            "riskEvents": detail_meta["riskEvents"],
             "items": enriched_items,
         }
         if scope == "theses":
@@ -460,6 +743,14 @@ async def collect_details(args) -> dict[str, Any]:
             message = f'Collected {len(enriched_items)} thesis detail record(s) for "{args.query}" in {degree_mode} mode.'
         else:
             message = f'Collected {len(enriched_items)} paper detail record(s) for "{args.query}".'
+        if detail_meta["blocked"]:
+            return blocked(detail_meta["blockedMessage"], data, page_url=page.url)
+        if detail_meta["stoppedEarly"]:
+            return partial(
+                f'{message} CNKI throttling forced an early stop before every queued detail page could be collected.',
+                data,
+                page_url=page.url,
+            )
         return ok(message, data, page_url=page.url)
 
 
